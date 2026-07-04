@@ -164,3 +164,7 @@ class PnLSnapshot:
     realized_pnl: float
     total_pnl: float
     num_positions: int
+    nifty_realized: float = 0.0
+    nifty_unrealized: float = 0.0
+    banknifty_realized: float = 0.0
+    banknifty_unrealized: float = 0.0

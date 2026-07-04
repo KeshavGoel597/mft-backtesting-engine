@@ -115,6 +115,18 @@ class ATMStraddleStrategy(BaseStrategy):
             )
             return orders
 
+        # Enforce that both CE and PE must have valid prices before we enter or shift
+        price_ce = market_state.get_option_price(new_ce)
+        price_pe = market_state.get_option_price(new_pe)
+        if price_ce is None or price_pe is None:
+            logger.debug(
+                "%s %s: Delaying straddle entry/shift at strike %d: "
+                "CE %s has price %s, PE %s has price %s (no market data yet)",
+                timestamp, self.underlying, new_strike,
+                new_ce.symbol, price_ce, new_pe.symbol, price_pe,
+            )
+            return orders
+
         # Close existing positions if strike changed
         if self._current_ce is not None:
             orders.append(Order(

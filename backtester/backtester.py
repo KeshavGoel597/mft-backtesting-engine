@@ -50,11 +50,11 @@ class BacktestResult:
 class DailySummary:
     """Summary metrics for one trading day."""
     date: dt.date
-    underlying: str
-    num_trades: int
-    num_strike_changes: int
-    realized_pnl: float
-    closing_pnl: float  # total PnL at EOD (realized)
+    nifty_trades: int
+    banknifty_trades: int
+    nifty_pnl: float
+    banknifty_pnl: float
+    combined_pnl: float
     wall_time_seconds: float
 
 
@@ -161,7 +161,7 @@ class Backtester:
         for strat in self._strategies:
             key = getattr(strat, 'underlying', str(strat))
             strategy_trade_counts[key] = 0
-            strategy_start_pnl[key] = self._portfolio.realized_pnl
+            strategy_start_pnl[key] = self._portfolio.get_realized_pnl_by_underlying(key)
 
         # Replay
         engine = ReplayEngine(day_data, self._market_state)
@@ -218,18 +218,16 @@ class Backtester:
             self._portfolio.mark_to_market(self._market_state, last_timestamp)
 
         # Build daily summaries
-        summaries = []
-        day_start = time.time()
-        for strat in self._strategies:
-            key = getattr(strat, 'underlying', str(strat))
-            summaries.append(DailySummary(
-                date=day_data.date,
-                underlying=key,
-                num_trades=strategy_trade_counts.get(key, 0),
-                num_strike_changes=strategy_trade_counts.get(key, 0) // 4,  # approx: sell CE+PE + buy CE+PE = 4 trades
-                realized_pnl=self._portfolio.realized_pnl - strategy_start_pnl.get(key, 0.0),
-                closing_pnl=self._portfolio.realized_pnl,
-                wall_time_seconds=0.0,  # filled by caller
-            ))
-
-        return second_count, summaries
+        nifty_pnl = self._portfolio.get_realized_pnl_by_underlying("NIFTY") - strategy_start_pnl.get("NIFTY", 0.0)
+        banknifty_pnl = self._portfolio.get_realized_pnl_by_underlying("BANKNIFTY") - strategy_start_pnl.get("BANKNIFTY", 0.0)
+        
+        summary = DailySummary(
+            date=day_data.date,
+            nifty_trades=strategy_trade_counts.get("NIFTY", 0),
+            banknifty_trades=strategy_trade_counts.get("BANKNIFTY", 0),
+            nifty_pnl=nifty_pnl,
+            banknifty_pnl=banknifty_pnl,
+            combined_pnl=nifty_pnl + banknifty_pnl,
+            wall_time_seconds=0.0,  # filled by caller
+        )
+        return second_count, [summary]

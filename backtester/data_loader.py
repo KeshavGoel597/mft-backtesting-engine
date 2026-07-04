@@ -44,6 +44,22 @@ _OPTION_FILENAME_RE = re.compile(
 SUPPORTED_UNDERLYINGS = {"NIFTY", "BANKNIFTY"}
 
 
+@dataclass
+class ValidationReport:
+    """Tracks data anomalies and metadata during ingestion."""
+    total_files_scanned: int = 0
+    loaded_options: int = 0
+    missing_files: int = 0
+    duplicate_timestamps: int = 0
+    malformed_filenames: int = 0
+    skipped_underlying: int = 0
+    non_positive_prices: int = 0
+    short_rows: int = 0
+
+
+validation_report = ValidationReport()
+
+
 # ---------------------------------------------------------------------------
 # Filename Parser
 # ---------------------------------------------------------------------------
@@ -60,6 +76,7 @@ def parse_option_filename(filename_stem: str) -> Optional[Instrument]:
     """
     m = _OPTION_FILENAME_RE.match(filename_stem)
     if m is None:
+        validation_report.malformed_filenames += 1
         return None
 
     underlying = m.group(1)
@@ -73,6 +90,7 @@ def parse_option_filename(filename_stem: str) -> Optional[Instrument]:
         option_type = OptionType(opt_type_str)
     except (ValueError, KeyError):
         logger.warning("Could not parse option filename: %s", filename_stem)
+        validation_report.malformed_filenames += 1
         return None
 
     return Instrument(
@@ -120,23 +138,32 @@ def load_futures_ticks(
     ticks: List[FuturesTick] = []
     if not csv_path.exists():
         logger.warning("Futures file not found: %s", csv_path)
+        validation_report.missing_files += 1
         return ticks
 
+    seen_timestamps = set()
     with open(csv_path, "r", newline="") as f:
         reader = csv.reader(f)
         for row_num, row in enumerate(reader, 1):
             if len(row) < 5:
                 logger.debug("Skipping short row %d in %s", row_num, csv_path.name)
+                validation_report.short_rows += 1
                 continue
             try:
                 ts, price, volume, oi = _parse_csv_row(row, date_hint)
             except (ValueError, IndexError) as exc:
                 logger.debug("Bad row %d in %s: %s", row_num, csv_path.name, exc)
+                validation_report.short_rows += 1  # count parsing errors as bad/short row issues
                 continue
 
             if price <= 0:
                 logger.debug("Non-positive price at row %d in %s", row_num, csv_path.name)
+                validation_report.non_positive_prices += 1
                 continue
+
+            if ts in seen_timestamps:
+                validation_report.duplicate_timestamps += 1
+            seen_timestamps.add(ts)
 
             ticks.append(FuturesTick(
                 underlying=underlying,
@@ -159,20 +186,29 @@ def load_option_ticks(
     ticks: List[Tick] = []
     if not csv_path.exists():
         logger.warning("Option file not found: %s", csv_path)
+        validation_report.missing_files += 1
         return ticks
 
+    seen_timestamps = set()
     with open(csv_path, "r", newline="") as f:
         reader = csv.reader(f)
         for row_num, row in enumerate(reader, 1):
             if len(row) < 5:
+                validation_report.short_rows += 1
                 continue
             try:
                 ts, price, volume, oi = _parse_csv_row(row, date_hint)
             except (ValueError, IndexError):
+                validation_report.short_rows += 1
                 continue
 
             if price <= 0:
+                validation_report.non_positive_prices += 1
                 continue
+
+            if ts in seen_timestamps:
+                validation_report.duplicate_timestamps += 1
+            seen_timestamps.add(ts)
 
             ticks.append(Tick(
                 instrument=instrument,
@@ -303,11 +339,13 @@ def load_day(day_dir: Path) -> DayData:
         for fname in sorted(os.listdir(options_dir)):
             if not fname.endswith(".csv"):
                 continue
+            validation_report.total_files_scanned += 1
             stem = fname[:-4]  # remove .csv
             inst = parse_option_filename(stem)
             if inst is None:
                 continue
             if inst.underlying not in SUPPORTED_UNDERLYINGS:
+                validation_report.skipped_underlying += 1
                 continue
             registry.instruments.append(inst)
             instrument_file_map[inst] = options_dir / fname
@@ -339,6 +377,7 @@ def load_day(day_dir: Path) -> DayData:
             csv_path = instrument_file_map.get(inst)
             if csv_path is None:
                 continue
+            validation_report.loaded_options += 1
             ticks = load_option_ticks(csv_path, inst, trading_date)
             if ticks:
                 option_ticks[inst] = ticks

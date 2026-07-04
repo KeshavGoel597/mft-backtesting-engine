@@ -29,33 +29,28 @@ plt.style.use("seaborn-v0_8-darkgrid")
 def plot_equity_curve(
     snapshots: List[PnLSnapshot],
     output_path: Path,
-    title: str = "Equity Curve — Total PnL Over Time",
+    title: str = "Equity Curve — Cumulative PnL Over Time",
 ) -> None:
-    """Plot cumulative total PnL over the entire backtest."""
+    """Plot cumulative total PnL over the entire backtest, split by underlying."""
     if not snapshots:
         logger.warning("No PnL snapshots to plot")
         return
 
     timestamps = [s.timestamp for s in snapshots]
     total_pnl = [s.total_pnl for s in snapshots]
+    nifty_pnl = [s.nifty_realized + s.nifty_unrealized for s in snapshots]
+    banknifty_pnl = [s.banknifty_realized + s.banknifty_unrealized for s in snapshots]
 
     fig, ax = plt.subplots(figsize=(14, 6))
-    ax.plot(timestamps, total_pnl, linewidth=0.8, color="#2196F3", alpha=0.9)
-    ax.fill_between(
-        timestamps, total_pnl, 0,
-        where=[p >= 0 for p in total_pnl],
-        color="#4CAF50", alpha=0.15, label="Profit",
-    )
-    ax.fill_between(
-        timestamps, total_pnl, 0,
-        where=[p < 0 for p in total_pnl],
-        color="#F44336", alpha=0.15, label="Loss",
-    )
+    ax.plot(timestamps, total_pnl, linewidth=1.5, color="#2196F3", label="Combined PnL")
+    ax.plot(timestamps, nifty_pnl, linewidth=0.9, color="#4CAF50", linestyle="--", alpha=0.8, label="NIFTY PnL")
+    ax.plot(timestamps, banknifty_pnl, linewidth=0.9, color="#FF9800", linestyle="--", alpha=0.8, label="BANKNIFTY PnL")
+
     ax.axhline(y=0, color="gray", linewidth=0.5, linestyle="--")
     ax.set_title(title, fontsize=14, fontweight="bold")
     ax.set_xlabel("Time")
-    ax.set_ylabel("Total PnL (INR)")
-    ax.legend()
+    ax.set_ylabel("PnL (INR)")
+    ax.legend(frameon=True, facecolor="white", edgecolor="none")
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%m-%d"))
     ax.xaxis.set_major_locator(mdates.DayLocator(interval=2))
     fig.autofmt_xdate()
@@ -70,19 +65,25 @@ def plot_realized_pnl(
     output_path: Path,
     title: str = "Realized PnL Over Time",
 ) -> None:
-    """Plot realized PnL (stepwise, increases only on trade closes)."""
+    """Plot realized PnL (stepwise, split by underlying)."""
     if not snapshots:
         return
 
     timestamps = [s.timestamp for s in snapshots]
     realized = [s.realized_pnl for s in snapshots]
+    nifty_realized = [s.nifty_realized for s in snapshots]
+    banknifty_realized = [s.banknifty_realized for s in snapshots]
 
     fig, ax = plt.subplots(figsize=(14, 6))
-    ax.plot(timestamps, realized, linewidth=0.8, color="#FF9800")
+    ax.plot(timestamps, realized, linewidth=1.5, color="#FF9800", label="Combined Realized")
+    ax.plot(timestamps, nifty_realized, linewidth=0.9, color="#4CAF50", linestyle="--", alpha=0.8, label="NIFTY Realized")
+    ax.plot(timestamps, banknifty_realized, linewidth=0.9, color="#00BCD4", linestyle="--", alpha=0.8, label="BANKNIFTY Realized")
+
     ax.axhline(y=0, color="gray", linewidth=0.5, linestyle="--")
     ax.set_title(title, fontsize=14, fontweight="bold")
     ax.set_xlabel("Time")
     ax.set_ylabel("Realized PnL (INR)")
+    ax.legend(frameon=True, facecolor="white", edgecolor="none")
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%m-%d"))
     ax.xaxis.set_major_locator(mdates.DayLocator(interval=2))
     fig.autofmt_xdate()
@@ -95,33 +96,31 @@ def plot_realized_pnl(
 def plot_daily_pnl_bar(
     summaries: List[DailySummary],
     output_path: Path,
-    title: str = "Daily Realized PnL",
+    title: str = "Daily Realized PnL by Underlying",
 ) -> None:
-    """Bar chart of per-day realized PnL."""
+    """Bar chart of per-day realized PnL split side-by-side."""
     if not summaries:
         return
 
-    # Aggregate by date (sum across underlyings)
-    daily_agg: dict[dt.date, float] = {}
-    for s in summaries:
-        daily_agg[s.date] = daily_agg.get(s.date, 0.0) + s.realized_pnl
+    dates = sorted([s.date for s in summaries])
+    nifty_pnls = [s.nifty_pnl for s in summaries]
+    banknifty_pnls = [s.banknifty_pnl for s in summaries]
 
-    dates = sorted(daily_agg.keys())
-    pnls = [daily_agg[d] for d in dates]
-    colors = ["#4CAF50" if p >= 0 else "#F44336" for p in pnls]
+    import numpy as np
+    x = np.arange(len(dates))
+    width = 0.35
 
     fig, ax = plt.subplots(figsize=(14, 6))
-    ax.bar(
-        [d.strftime("%m-%d") for d in dates],
-        pnls,
-        color=colors,
-        edgecolor="white",
-        linewidth=0.5,
-    )
+    ax.bar(x - width/2, nifty_pnls, width, label="NIFTY", color="#4CAF50", alpha=0.85)
+    ax.bar(x + width/2, banknifty_pnls, width, label="BANKNIFTY", color="#FF9800", alpha=0.85)
+
     ax.axhline(y=0, color="gray", linewidth=0.5, linestyle="--")
     ax.set_title(title, fontsize=14, fontweight="bold")
     ax.set_xlabel("Trading Day")
     ax.set_ylabel("Realized PnL (INR)")
+    ax.set_xticks(x)
+    ax.set_xticklabels([d.strftime("%m-%d") for d in dates])
+    ax.legend(frameon=True, facecolor="white", edgecolor="none")
     fig.autofmt_xdate()
     fig.tight_layout()
     fig.savefig(output_path, dpi=150)

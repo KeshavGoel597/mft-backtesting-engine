@@ -29,21 +29,22 @@ from backtester.plots import generate_all_plots
 DATA_ROOT = Path(__file__).parent / "allData"
 OUTPUT_DIR = Path(__file__).parent / "output"
 
-# Logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    datefmt="%H:%M:%S",
-    handlers=[
-        logging.StreamHandler(sys.stdout),
-        logging.FileHandler(OUTPUT_DIR / "backtest.log", mode="w"),
-    ],
-)
 logger = logging.getLogger(__name__)
 
 
 def main() -> None:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Setup Logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        datefmt="%H:%M:%S",
+        handlers=[
+            logging.StreamHandler(sys.stdout),
+            logging.FileHandler(OUTPUT_DIR / "backtest.log", mode="w"),
+        ],
+    )
 
     logger.info("=" * 60)
     logger.info("MFT Backtesting Framework")
