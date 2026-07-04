@@ -33,6 +33,7 @@ class Portfolio:
     def __init__(self) -> None:
         self._positions: Dict[Instrument, Position] = {}
         self._realized_pnl: float = 0.0
+        self._total_fees: float = 0.0
         self._realized_pnl_by_underlying: Dict[str, float] = {}
         self._trade_log: List[Trade] = []
         self._pnl_snapshots: List[PnLSnapshot] = []
@@ -44,6 +45,10 @@ class Portfolio:
     @property
     def realized_pnl(self) -> float:
         return self._realized_pnl
+
+    @property
+    def total_fees(self) -> float:
+        return self._total_fees
 
     def get_realized_pnl_by_underlying(self, underlying: str) -> float:
         """Calculate realized PnL for a specific underlying."""
@@ -91,6 +96,12 @@ class Portfolio:
         SELL → close an existing position, realize PnL.
         """
         self._trade_log.append(trade)
+        self._total_fees += trade.fees
+        self._realized_pnl -= trade.fees
+        und = trade.instrument.underlying
+        self._realized_pnl_by_underlying[und] = (
+            self._realized_pnl_by_underlying.get(und, 0.0) - trade.fees
+        )
 
         if trade.side == Side.BUY:
             if trade.instrument in self._positions:
@@ -126,7 +137,6 @@ class Portfolio:
             # Realize PnL: we bought at entry_price, selling at trade.price
             pnl = (trade.price - pos.entry_price) * pos.quantity
             self._realized_pnl += pnl
-            und = trade.instrument.underlying
             self._realized_pnl_by_underlying[und] = self._realized_pnl_by_underlying.get(und, 0.0) + pnl
             logger.debug(
                 "Closed position: SELL %s @ %.2f (entry=%.2f, pnl=%.2f)",
@@ -151,6 +161,7 @@ class Portfolio:
             realized_pnl=self._realized_pnl,
             total_pnl=self.total_pnl,
             num_positions=self.num_positions,
+            total_fees=self._total_fees,
             nifty_realized=self.get_realized_pnl_by_underlying("NIFTY"),
             nifty_unrealized=self.get_unrealized_pnl_by_underlying("NIFTY"),
             banknifty_realized=self.get_realized_pnl_by_underlying("BANKNIFTY"),
@@ -174,6 +185,7 @@ class Portfolio:
         """Complete reset for a fresh simulation."""
         self._positions.clear()
         self._realized_pnl = 0.0
+        self._total_fees = 0.0
         self._realized_pnl_by_underlying.clear()
         self._trade_log.clear()
         self._pnl_snapshots.clear()

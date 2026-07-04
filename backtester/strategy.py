@@ -16,12 +16,12 @@ from __future__ import annotations
 import datetime as dt
 import logging
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Tuple
+from typing import List, Optional
 
 from .data_loader import InstrumentRegistry
 from .instrument_selector import ATMSelector, InstrumentSelector
 from .market_state import MarketState
-from .models import Instrument, OptionType, Order, Side
+from .models import Instrument, OptionType, Order, Side, Trade
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +62,16 @@ class BaseStrategy(ABC):
         """
         ...
 
+    @abstractmethod
+    def on_trades(self, trades: List[Trade], timestamp: dt.datetime) -> None:
+        """Receive fill confirmations for the strategy's own orders."""
+        ...
+
+    @abstractmethod
+    def reset_for_new_day(self) -> None:
+        """Reset any in-memory day state before a new session starts."""
+        ...
+
 
 class ATMStraddleStrategy(BaseStrategy):
     """
@@ -73,9 +83,14 @@ class ATMStraddleStrategy(BaseStrategy):
     4. At end of day → sell all.
     """
 
-    def __init__(self, underlying: str) -> None:
+    def __init__(
+        self,
+        underlying: str,
+        max_option_quote_age: Optional[dt.timedelta] = None,
+    ) -> None:
         self.underlying = underlying
         self._selector: InstrumentSelector = ATMSelector()
+        self._max_option_quote_age = max_option_quote_age
 
         # Current held instruments (None if no position)
         self._current_ce: Optional[Instrument] = None
@@ -116,14 +131,18 @@ class ATMStraddleStrategy(BaseStrategy):
             return orders
 
         # Enforce that both CE and PE must have valid prices before we enter or shift
-        price_ce = market_state.get_option_price(new_ce)
-        price_pe = market_state.get_option_price(new_pe)
-        if price_ce is None or price_pe is None:
+        ce_is_fresh = market_state.has_fresh_option_data(
+            new_ce, timestamp, self._max_option_quote_age
+        )
+        pe_is_fresh = market_state.has_fresh_option_data(
+            new_pe, timestamp, self._max_option_quote_age
+        )
+        if not ce_is_fresh or not pe_is_fresh:
             logger.debug(
                 "%s %s: Delaying straddle entry/shift at strike %d: "
-                "CE %s has price %s, PE %s has price %s (no market data yet)",
+                "CE %s fresh=%s, PE %s fresh=%s",
                 timestamp, self.underlying, new_strike,
-                new_ce.symbol, price_ce, new_pe.symbol, price_pe,
+                new_ce.symbol, ce_is_fresh, new_pe.symbol, pe_is_fresh,
             )
             return orders
 
@@ -161,11 +180,6 @@ class ATMStraddleStrategy(BaseStrategy):
             reason=f"ATM_ENTER_{new_strike}",
         ))
 
-        # Update state
-        self._current_ce = new_ce
-        self._current_pe = new_pe
-        self._current_strike = new_strike
-
         logger.debug(
             "%s %s: ATM strike = %d, orders = %d",
             timestamp, self.underlying, new_strike, len(orders),
@@ -199,9 +213,35 @@ class ATMStraddleStrategy(BaseStrategy):
                 reason="EOD_CLOSE",
             ))
 
-        # Reset for next day
+        return orders
+
+    def on_trades(self, trades: List[Trade], timestamp: dt.datetime) -> None:
+        if not trades:
+            return
+
+        buy_trades = [trade for trade in trades if trade.side == Side.BUY]
+        if buy_trades:
+            ce = next(
+                (trade.instrument for trade in buy_trades if trade.instrument.option_type == OptionType.CE),
+                None,
+            )
+            pe = next(
+                (trade.instrument for trade in buy_trades if trade.instrument.option_type == OptionType.PE),
+                None,
+            )
+            if ce is None or pe is None:
+                logger.warning("%s %s: incomplete straddle fill state update", timestamp, self.underlying)
+                return
+            self._current_ce = ce
+            self._current_pe = pe
+            self._current_strike = ce.strike
+            return
+
         self._current_ce = None
         self._current_pe = None
         self._current_strike = None
 
-        return orders
+    def reset_for_new_day(self) -> None:
+        self._current_ce = None
+        self._current_pe = None
+        self._current_strike = None

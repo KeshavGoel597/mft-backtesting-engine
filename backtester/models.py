@@ -115,6 +115,9 @@ class Trade:
     timestamp: dt.datetime
     order: Order               # reference back to originating order
     trade_id: int = 0
+    reference_price: float = 0.0
+    fees: float = 0.0
+    slippage: float = 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -164,6 +167,7 @@ class PnLSnapshot:
     realized_pnl: float
     total_pnl: float
     num_positions: int
+    total_fees: float = 0.0
     nifty_realized: float = 0.0
     nifty_unrealized: float = 0.0
     banknifty_realized: float = 0.0

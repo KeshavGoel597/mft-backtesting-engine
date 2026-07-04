@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from .data_loader import DayData, discover_trading_days, load_day
+from .data_loader import DayData, discover_trading_days, load_day, reset_validation_report
 from .execution import ExecutionEngine
 from .market_state import MarketState
 from .models import PnLSnapshot, Trade
@@ -41,6 +41,7 @@ class BacktestResult:
     pnl_snapshots: List[PnLSnapshot]
     daily_summaries: List[DailySummary]
     total_realized_pnl: float
+    total_fees: float
     total_days: int
     total_seconds_simulated: int
     wall_time_seconds: float
@@ -80,6 +81,7 @@ class Backtester:
         data_root: Path,
         strategies: List[BaseStrategy],
         snapshot_interval: int = 1,  # record PnL snapshot every N seconds
+        execution_engine: Optional[ExecutionEngine] = None,
     ) -> None:
         self._data_root = data_root
         self._strategies = strategies
@@ -87,7 +89,7 @@ class Backtester:
 
         # Shared state
         self._market_state = MarketState()
-        self._execution = ExecutionEngine()
+        self._execution = execution_engine or ExecutionEngine()
         self._portfolio = Portfolio()
 
     @property
@@ -103,6 +105,9 @@ class Backtester:
         total_seconds = 0
 
         overall_start = time.time()
+        reset_validation_report()
+        self._execution.reset()
+        self._portfolio.full_reset()
         logger.info("=" * 60)
         logger.info("BACKTEST START — %d trading days", len(day_dirs))
         logger.info("=" * 60)
@@ -117,9 +122,10 @@ class Backtester:
             # Run simulation for this day
             day_seconds, day_summary_list = self._run_day(day_data)
             total_seconds += day_seconds
-            daily_summaries.extend(day_summary_list)
-
             day_elapsed = time.time() - day_start
+            for summary in day_summary_list:
+                summary.wall_time_seconds = day_elapsed
+            daily_summaries.extend(day_summary_list)
             logger.info(
                 "Day %s complete: %d seconds simulated in %.1fs wall time | PnL: %.2f",
                 day_data.date, day_seconds, day_elapsed, self._portfolio.total_pnl,
@@ -140,6 +146,7 @@ class Backtester:
             pnl_snapshots=self._portfolio.pnl_snapshots,
             daily_summaries=daily_summaries,
             total_realized_pnl=self._portfolio.realized_pnl,
+            total_fees=self._portfolio.total_fees,
             total_days=len(day_dirs),
             total_seconds_simulated=total_seconds,
             wall_time_seconds=overall_elapsed,
@@ -154,6 +161,8 @@ class Backtester:
         # Reset market state for new day
         self._market_state.clear()
         self._portfolio.reset_for_new_day()
+        for strat in self._strategies:
+            strat.reset_for_new_day()
 
         # Track per-strategy metrics
         strategy_trade_counts: Dict[str, int] = {}
@@ -183,13 +192,18 @@ class Backtester:
 
                 if orders:
                     trades = self._execution.execute(
-                        orders, self._market_state, timestamp
+                        orders,
+                        self._market_state,
+                        timestamp,
+                        atomic_batch=True,
                     )
                     for trade in trades:
                         self._portfolio.apply_trade(trade)
 
                     key = getattr(strat, 'underlying', str(strat))
                     strategy_trade_counts[key] += len(trades)
+                    if len(trades) == len(orders):
+                        strat.on_trades(trades, timestamp)
 
             # Mark-to-market
             if second_count % self._snapshot_interval == 0:
@@ -206,13 +220,18 @@ class Backtester:
                 )
                 if eod_orders:
                     trades = self._execution.execute(
-                        eod_orders, self._market_state, last_timestamp
+                        eod_orders,
+                        self._market_state,
+                        last_timestamp,
+                        atomic_batch=True,
                     )
                     for trade in trades:
                         self._portfolio.apply_trade(trade)
 
                     key = getattr(strat, 'underlying', str(strat))
                     strategy_trade_counts[key] += len(trades)
+                    if len(trades) == len(eod_orders):
+                        strat.on_trades(trades, last_timestamp)
 
             # Final MTM snapshot
             self._portfolio.mark_to_market(self._market_state, last_timestamp)

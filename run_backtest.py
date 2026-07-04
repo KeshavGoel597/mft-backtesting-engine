@@ -6,13 +6,15 @@ Usage:
     python3 run_backtest.py
 """
 
+import argparse
+import datetime as dt
 import logging
 import sys
-import time
 from pathlib import Path
 
 # Project imports
 from backtester.backtester import Backtester
+from backtester.execution import ExecutionConfig, ExecutionEngine
 from backtester.strategy import ATMStraddleStrategy
 from backtester.analytics import (
     write_trade_log,
@@ -32,57 +34,85 @@ OUTPUT_DIR = Path(__file__).parent / "output"
 logger = logging.getLogger(__name__)
 
 
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Run the MFT options backtest.")
+    parser.add_argument("--data-root", type=Path, default=DATA_ROOT)
+    parser.add_argument("--output-dir", type=Path, default=OUTPUT_DIR)
+    parser.add_argument("--snapshot-interval", type=int, default=1)
+    parser.add_argument("--slippage-bps", type=float, default=0.0)
+    parser.add_argument("--fee-per-order", type=float, default=0.0)
+    parser.add_argument("--max-quote-age-seconds", type=int, default=None)
+    parser.add_argument("--log-level", default="INFO")
+    parser.add_argument("--skip-plots", action="store_true")
+    return parser.parse_args()
+
+
 def main() -> None:
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    args = parse_args()
+    args.output_dir.mkdir(parents=True, exist_ok=True)
 
     # Setup Logging
     logging.basicConfig(
-        level=logging.INFO,
+        level=getattr(logging, args.log_level.upper(), logging.INFO),
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
         datefmt="%H:%M:%S",
         handlers=[
             logging.StreamHandler(sys.stdout),
-            logging.FileHandler(OUTPUT_DIR / "backtest.log", mode="w"),
+            logging.FileHandler(args.output_dir / "backtest.log", mode="w"),
         ],
     )
 
     logger.info("=" * 60)
     logger.info("MFT Backtesting Framework")
     logger.info("Strategy: ATM Straddle on NIFTY + BANKNIFTY")
-    logger.info("Data: %s", DATA_ROOT)
+    logger.info("Data: %s", args.data_root)
     logger.info("=" * 60)
+
+    max_quote_age = None
+    if args.max_quote_age_seconds is not None:
+        max_quote_age = dt.timedelta(seconds=args.max_quote_age_seconds)
+
+    execution_engine = ExecutionEngine(
+        ExecutionConfig(
+            slippage_bps=args.slippage_bps,
+            fee_per_order=args.fee_per_order,
+            max_quote_age=max_quote_age,
+        )
+    )
 
     # Create strategies — one per underlying
     strategies = [
-        ATMStraddleStrategy("NIFTY"),
-        ATMStraddleStrategy("BANKNIFTY"),
+        ATMStraddleStrategy("NIFTY", max_option_quote_age=max_quote_age),
+        ATMStraddleStrategy("BANKNIFTY", max_option_quote_age=max_quote_age),
     ]
 
     # Run backtest
     bt = Backtester(
-        data_root=DATA_ROOT,
+        data_root=args.data_root,
         strategies=strategies,
-        snapshot_interval=1,  # snapshot every second
+        snapshot_interval=args.snapshot_interval,
+        execution_engine=execution_engine,
     )
     result = bt.run()
 
     # --- Write outputs ---
-    write_trade_log(result.trades, OUTPUT_DIR / "trade_log.csv")
-    write_daily_summary(result.daily_summaries, OUTPUT_DIR / "daily_summary.csv")
-    write_pnl_snapshots(result.pnl_snapshots, OUTPUT_DIR / "pnl_snapshots.csv")
+    write_trade_log(result.trades, args.output_dir / "trade_log.csv")
+    write_daily_summary(result.daily_summaries, args.output_dir / "daily_summary.csv")
+    write_pnl_snapshots(result.pnl_snapshots, args.output_dir / "pnl_snapshots.csv")
 
     # --- Print summary ---
     print_summary(result)
 
     # --- Generate plots ---
-    try:
-        generate_all_plots(result, OUTPUT_DIR)
-    except ImportError as e:
-        logger.warning("Could not generate plots (matplotlib missing?): %s", e)
-    except Exception as e:
-        logger.error("Error generating plots: %s", e, exc_info=True)
+    if not args.skip_plots:
+        try:
+            generate_all_plots(result, args.output_dir)
+        except ImportError as e:
+            logger.warning("Could not generate plots (matplotlib missing?): %s", e)
+        except Exception as e:
+            logger.error("Error generating plots: %s", e, exc_info=True)
 
-    logger.info("All outputs saved to %s", OUTPUT_DIR)
+    logger.info("All outputs saved to %s", args.output_dir)
 
 
 if __name__ == "__main__":

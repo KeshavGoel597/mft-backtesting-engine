@@ -10,7 +10,7 @@ Responsibilities:
 from __future__ import annotations
 
 import datetime as dt
-from typing import Dict, List, Optional, Set
+from typing import Dict, Optional, Set
 
 from .models import FuturesTick, Instrument, OptionType, Tick
 
@@ -64,6 +64,27 @@ class MarketState:
         """Latest option price for a specific instrument."""
         tick = self._option_ticks.get(instrument)
         return tick.price if tick else None
+
+    def get_option_tick_age(
+        self, instrument: Instrument, timestamp: dt.datetime
+    ) -> Optional[dt.timedelta]:
+        tick = self._option_ticks.get(instrument)
+        if tick is None:
+            return None
+        return timestamp - tick.timestamp
+
+    def has_fresh_option_data(
+        self,
+        instrument: Instrument,
+        timestamp: dt.datetime,
+        max_age: Optional[dt.timedelta] = None,
+    ) -> bool:
+        tick = self._option_ticks.get(instrument)
+        if tick is None:
+            return False
+        if max_age is None:
+            return True
+        return timestamp - tick.timestamp <= max_age
 
     def has_option_data(self, instrument: Instrument) -> bool:
         return instrument in self._option_ticks

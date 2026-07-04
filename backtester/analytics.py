@@ -28,7 +28,8 @@ def write_trade_log(trades: List[Trade], output_path: Path) -> None:
         writer = csv.writer(f)
         writer.writerow([
             "trade_id", "timestamp", "underlying", "expiry", "strike",
-            "option_type", "side", "quantity", "price", "reason",
+            "option_type", "side", "quantity", "price", "reference_price",
+            "fees", "slippage", "reason",
         ])
         for t in trades:
             writer.writerow([
@@ -41,6 +42,9 @@ def write_trade_log(trades: List[Trade], output_path: Path) -> None:
                 t.side.value,
                 t.quantity,
                 f"{t.price:.2f}",
+                f"{t.reference_price:.2f}",
+                f"{t.fees:.2f}",
+                f"{t.slippage:.2f}",
                 t.order.reason,
             ])
     logger.info("Trade log written to %s (%d trades)", output_path, len(trades))
@@ -77,6 +81,7 @@ def write_pnl_snapshots(
         writer.writerow([
             "timestamp", "unrealized_pnl", "realized_pnl",
             "total_pnl", "num_positions",
+            "total_fees",
             "nifty_realized", "nifty_unrealized",
             "banknifty_realized", "banknifty_unrealized",
         ])
@@ -87,6 +92,7 @@ def write_pnl_snapshots(
                 f"{s.realized_pnl:.2f}",
                 f"{s.total_pnl:.2f}",
                 s.num_positions,
+                f"{s.total_fees:.2f}",
                 f"{s.nifty_realized:.2f}",
                 f"{s.nifty_unrealized:.2f}",
                 f"{s.banknifty_realized:.2f}",
@@ -163,6 +169,7 @@ def print_summary(result: BacktestResult) -> None:
     print(f"  Avg Trades / Day:        {stats['avg_trades_day']:.1f}")
     print(f"  Avg Option Holding Time: {stats['avg_holding_time']}")
     print(f"  Total Realized PnL:      {result.total_realized_pnl:,.2f} INR")
+    print(f"  Total Fees:              {result.total_fees:,.2f} INR")
     print(f"  Max Peak-to-Trough DD:   {stats['max_drawdown']:,.2f} INR")
     print(f"  Win Rate (Round-trips):  {stats['win_rate']:.1f}%")
     print(f"  Largest Winning Trade:   {stats['largest_win']:.2f} INR")

@@ -7,9 +7,10 @@ Separated from Strategy so that different selection logic
 
 from __future__ import annotations
 
+from bisect import bisect_left
 import datetime as dt
 from abc import ABC, abstractmethod
-from typing import List, Optional, Tuple
+from typing import Optional, Tuple
 
 from .data_loader import InstrumentRegistry
 from .market_state import MarketState
@@ -88,9 +89,17 @@ class ATMSelector(InstrumentSelector):
         if not strikes:
             return None
 
-        # Find closest strike — tie-break to lower
-        best_strike = min(strikes, key=lambda s: (abs(s - futures_price), s))
-        return best_strike
+        insert_at = bisect_left(strikes, futures_price)
+        if insert_at == 0:
+            return strikes[0]
+        if insert_at >= len(strikes):
+            return strikes[-1]
+
+        lower = strikes[insert_at - 1]
+        upper = strikes[insert_at]
+        if abs(lower - futures_price) <= abs(upper - futures_price):
+            return lower
+        return upper
 
     def get_instruments(
         self,
@@ -103,13 +112,6 @@ class ATMSelector(InstrumentSelector):
         if expiry is None:
             return None, None
 
-        ce_list = registry.get_instruments(
-            underlying, expiry=expiry, strike=strike, option_type=OptionType.CE
-        )
-        pe_list = registry.get_instruments(
-            underlying, expiry=expiry, strike=strike, option_type=OptionType.PE
-        )
-
-        ce = ce_list[0] if ce_list else None
-        pe = pe_list[0] if pe_list else None
+        ce = registry.get_instrument(underlying, expiry, strike, OptionType.CE)
+        pe = registry.get_instrument(underlying, expiry, strike, OptionType.PE)
         return ce, pe

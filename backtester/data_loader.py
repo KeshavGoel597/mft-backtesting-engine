@@ -22,7 +22,7 @@ import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from .models import FuturesTick, Instrument, OptionType, Tick
 
@@ -58,6 +58,12 @@ class ValidationReport:
 
 
 validation_report = ValidationReport()
+
+
+def reset_validation_report() -> None:
+    """Reset global ingestion counters before a fresh backtest run."""
+    global validation_report
+    validation_report = ValidationReport()
 
 
 # ---------------------------------------------------------------------------
@@ -173,7 +179,7 @@ def load_futures_ticks(
                 open_interest=oi,
             ))
 
-    logger.info("Loaded %d futures ticks from %s", len(ticks), csv_path.name)
+    logger.debug("Loaded %d futures ticks from %s", len(ticks), csv_path.name)
     return ticks
 
 
@@ -218,7 +224,7 @@ def load_option_ticks(
                 open_interest=oi,
             ))
 
-    logger.info("Loaded %d option ticks from %s", len(ticks), csv_path.name)
+    logger.debug("Loaded %d option ticks from %s", len(ticks), csv_path.name)
     return ticks
 
 
@@ -244,18 +250,36 @@ class InstrumentRegistry:
     _expiries_by_underlying: Dict[str, List[dt.date]] = field(
         default_factory=dict, repr=False
     )
+    _strikes_by_key: Dict[Tuple[str, dt.date], List[int]] = field(
+        default_factory=dict, repr=False
+    )
+    _instrument_lookup: Dict[Tuple[str, dt.date, int, OptionType], Instrument] = field(
+        default_factory=dict, repr=False
+    )
 
     def build_indexes(self) -> None:
         """Build fast-lookup indexes. Call after instruments list is populated."""
         self._by_underlying.clear()
         self._expiries_by_underlying.clear()
+        self._strikes_by_key.clear()
+        self._instrument_lookup.clear()
 
         for inst in self.instruments:
             self._by_underlying.setdefault(inst.underlying, []).append(inst)
+            key = (inst.underlying, inst.expiry)
+            self._strikes_by_key.setdefault(key, []).append(inst.strike)
+            self._instrument_lookup[
+                (inst.underlying, inst.expiry, inst.strike, inst.option_type)
+            ] = inst
 
         for und, insts in self._by_underlying.items():
             expiries = sorted({i.expiry for i in insts})
             self._expiries_by_underlying[und] = expiries
+
+        self._strikes_by_key = {
+            key: sorted(set(strikes))
+            for key, strikes in self._strikes_by_key.items()
+        }
 
     def get_instruments(
         self,
@@ -289,8 +313,16 @@ class InstrumentRegistry:
         self, underlying: str, expiry: dt.date
     ) -> List[int]:
         """Return sorted list of strikes available for (underlying, expiry)."""
-        insts = self.get_instruments(underlying, expiry=expiry)
-        return sorted({i.strike for i in insts})
+        return list(self._strikes_by_key.get((underlying, expiry), []))
+
+    def get_instrument(
+        self,
+        underlying: str,
+        expiry: dt.date,
+        strike: int,
+        option_type: OptionType,
+    ) -> Optional[Instrument]:
+        return self._instrument_lookup.get((underlying, expiry, strike, option_type))
 
 
 # ---------------------------------------------------------------------------
@@ -385,6 +417,13 @@ def load_day(day_dir: Path) -> DayData:
     logger.info(
         "Day %s: loaded option ticks for %d instruments",
         trading_date,
+        len(option_ticks),
+    )
+    logger.info(
+        "Day %s load summary: futures=%d ticks, options=%d ticks across %d instruments",
+        trading_date,
+        sum(len(ticks) for ticks in futures_ticks.values()),
+        sum(len(ticks) for ticks in option_ticks.values()),
         len(option_ticks),
     )
 
