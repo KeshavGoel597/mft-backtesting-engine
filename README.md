@@ -1,25 +1,37 @@
-# MFT Internship Assignment Submission
+# MFT Backtesting Engine
 
-This repository contains a modular event-driven backtesting framework for the internship assignment:
+Event-driven backtesting framework for the MFT internship assignment.
 
-- Strategy: ATM straddle on `NIFTY` and `BANKNIFTY`
-- Market data: one month of tick-level futures and options CSV data
-- Outputs: trade log, daily summary, PnL snapshots, and plots
+The project simulates an ATM straddle strategy on `NIFTY` and `BANKNIFTY`, replays tick data second by second, and produces trade logs, daily summaries, PnL snapshots, and charts.
 
-## Project Structure
+## Highlights
 
-- `run_backtest.py`: main entry point
-- `backtester/`: framework modules
-- `tests/`: automated tests
-- `output/`: generated backtest reports and plots
-- `llm_context/`: supplementary design notes, assumptions, and assignment context
+- Clear separation of concerns across replay, market state, strategy, execution, portfolio, analytics, and plotting
+- Point-in-time state updates to avoid lookahead bias
+- Atomic multi-leg execution for straddle entry and exit
+- Configurable slippage, fees, and stale-quote rejection
+- CSV and chart outputs suitable for analysis and portfolio review
 
-## How To Run
+## Repository Layout
+
+- `run_backtest.py`: command-line entry point
+- `backtester/`: core framework modules
+- `tests/`: self-contained automated tests and fixtures
+- `output/`: example reports generated from a prior run
+- `llm_context/`: architecture notes, assumptions, and assignment context
+
+## Quick Start
 
 Install dependencies:
 
 ```bash
 pip install -r requirements.txt
+```
+
+Run the test suite:
+
+```bash
+pytest -q
 ```
 
 Run the backtest:
@@ -28,55 +40,52 @@ Run the backtest:
 python3 run_backtest.py
 ```
 
-Run the tests:
-
-```bash
-pytest -q
-```
-
-## Runtime Options
-
-The runner supports configurable execution realism:
+Useful runtime flags:
 
 ```bash
 python3 run_backtest.py \
   --slippage-bps 5 \
   --fee-per-order 2.0 \
-  --max-quote-age-seconds 2
+  --max-quote-age-seconds 2 \
+  --skip-plots
 ```
 
-Useful flags:
+## Data Expectations
 
-- `--skip-plots`
-- `--snapshot-interval N`
-- `--log-level INFO|DEBUG`
-- `--output-dir <path>`
+The full assignment dataset is not bundled in the repository. `run_backtest.py` expects a local `allData/` directory with the original day folders and CSV files.
 
-## Key Design Choices
+The automated tests do not depend on that external dataset. They generate a synthetic fixture tree that mirrors the expected file structure, so `pytest` should pass on a clean checkout.
 
-- Strict separation between replay, market state, strategy, execution, portfolio, and analytics
-- Point-in-time state updates to avoid lookahead bias
-- Atomic multi-leg execution for straddle orders
-- Configurable slippage, fees, and stale-quote rejection
-- Pre-filtering to nearest-expiry contracts for assignment-aligned performance
+## Generated Outputs
 
-## Deliverables Included
+Running the backtest writes reports to `output/`:
 
-The `output/` folder contains pre-generated results from the November 2022 backtest:
+- `trade_log.csv`
+- `daily_summary.csv`
+- `pnl_snapshots.csv`
+- `equity_curve.png`
+- `daily_pnl.png`
+- `realized_pnl.png`
+- `positions.png`
+- `backtest.log`
 
-| File | Description |
-|------|-------------|
-| `trade_log.csv` | All 32,692 trades with instrument, price, fees, slippage, and reason |
-| `daily_summary.csv` | Per-day NIFTY / BANKNIFTY trade counts and realized PnL |
-| `equity_curve.png` | Cumulative PnL curve split by underlying |
-| `daily_pnl.png` | Side-by-side daily PnL bar chart |
-| `realized_pnl.png` | Stepwise realized PnL over the month |
-| `positions.png` | Open position count over time |
+These files are generated artifacts and can be regenerated at any time.
 
-> `pnl_snapshots.csv` (second-by-second MTM, ~36MB) and `backtest.log` are excluded from the repo due to size but are generated locally on each run.
+## Design Notes
 
-## Notes
+Supplementary documentation lives in `llm_context/`:
 
-- Documented assumptions: `llm_context/assumptions.md`
-- Original problem statement: `llm_context/assignment.md`
-- Architecture and design decisions: `llm_context/architecture.md`, `llm_context/BACKTEST_FRAMEWORK_SPEC.md`
+- `assignment.md`: source problem statement
+- `assumptions.md`: implementation assumptions
+- `architecture.md`: system-level design
+- `BACKTEST_FRAMEWORK_SPEC.md`: module-level spec
+- `DOMAIN_MODEL.md`: domain model definitions
+
+## Resume Readiness Checklist
+
+This repository is structured to present well as a portfolio project, with:
+
+- A clear README and setup path
+- A deterministic test suite that runs without private data
+- Explicit documentation of what is generated versus source-controlled
+- Modular code that maps cleanly to the strategy/execution/replay architecture

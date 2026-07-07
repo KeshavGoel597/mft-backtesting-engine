@@ -8,16 +8,15 @@ import datetime as dt
 from pathlib import Path
 
 import sys
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from backtester.models import Instrument, OptionType
+from backtester.models import OptionType
 from backtester.data_loader import (
     parse_option_filename,
     load_day,
     discover_trading_days,
 )
-
-DATA_ROOT = Path(__file__).resolve().parent.parent / "allData"
 
 
 # ---------------------------------------------------------------------------
@@ -60,17 +59,17 @@ class TestFilenameParser:
 
 
 # ---------------------------------------------------------------------------
-# Data loading tests (require actual data)
+# Data loading tests (use synthetic fixture data)
 # ---------------------------------------------------------------------------
 
 class TestDayLoader:
 
-    def test_discover_days(self):
-        days = discover_trading_days(DATA_ROOT)
+    def test_discover_days(self, sample_data_root: Path):
+        days = discover_trading_days(sample_data_root)
         assert len(days) == 21, f"Expected 21 trading days, got {len(days)}"
 
-    def test_load_first_day(self):
-        day_dir = DATA_ROOT / "NSE_20221101"
+    def test_load_first_day(self, sample_data_root: Path):
+        day_dir = sample_data_root / "NSE_20221101"
         day_data = load_day(day_dir)
 
         # Date
@@ -104,9 +103,9 @@ class TestDayLoader:
         ]
         assert len(nifty_opts) > 10, f"Expected multiple NIFTY options, got {len(nifty_opts)}"
 
-    def test_strikes_around_atm(self):
+    def test_strikes_around_atm(self, sample_data_root: Path):
         """Verify we have strikes near the futures price (~18150 for NIFTY)."""
-        day_dir = DATA_ROOT / "NSE_20221101"
+        day_dir = sample_data_root / "NSE_20221101"
         day_data = load_day(day_dir)
 
         nearest = day_data.registry.nearest_expiry("NIFTY", dt.date(2022, 11, 1))

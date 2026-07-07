@@ -1,6 +1,11 @@
 allData/
 output/pnl_snapshots.csv
 output/backtest.log
+output/*.csv
+output/*.png
+.coverage
+coverage.xml
+htmlcov/
 .pytest_cache/
 __pycache__/
 *.pyc
@@ -12,4 +17,6 @@ dist/
 build/
 .venv/
 venv/
+.mypy_cache/
+.ruff_cache/
 llm_context/rawllmchat.md

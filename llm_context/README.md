@@ -10,7 +10,7 @@ These are **not** part of the framework's runtime code; they are reference mater
 | `architecture.md` | High-level architecture decisions |
 | `BACKTEST_FRAMEWORK_SPEC.md` | Detailed module-level specification |
 | `DOMAIN_MODEL.md` | Domain model definitions |
-| `DecisionDesicions.md` | Key design decision log |
+| `DecisionDecisions.md` | Key design decision log |
 | `datasetAnalysis.md` | Dataset exploration notes |
 | `context.md` | Additional context notes |
 | `implementationPlan.md` | Initial implementation plan |
