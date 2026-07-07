@@ -2,9 +2,31 @@
 """
 Main entry point — runs the complete backtest.
 
-Usage:
+Usage (basic):
     python3 run_backtest.py
+
+Usage (full):
+    python3 run_backtest.py \\
+        --data-root    allData/ \\
+        --output-dir   output/ \\
+        --log-level    INFO \\
+        --slippage-bps 5 \\
+        --fee-per-order 2.0 \\
+        --max-quote-age-seconds 2 \\
+        --snapshot-interval 1 \\
+        --skip-plots
+
+Flags:
+    --data-root              Path to tick data directory (default: allData/)
+    --output-dir             Path for generated outputs (default: output/)
+    --log-level              INFO or DEBUG (default: INFO)
+    --slippage-bps           Slippage in basis points applied on fill price (default: 0)
+    --fee-per-order          Fixed fee per order in INR (default: 0)
+    --max-quote-age-seconds  Reject fills if the last quote is older than N seconds (default: none)
+    --snapshot-interval      Record a PnL snapshot every N seconds (default: 1)
+    --skip-plots             Skip matplotlib chart generation
 """
+
 
 import argparse
 import datetime as dt

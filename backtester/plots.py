@@ -10,10 +10,11 @@ from __future__ import annotations
 import datetime as dt
 import logging
 import os
+import tempfile
 from pathlib import Path
 from typing import List, Optional
 
-_MPL_CACHE_DIR = Path(__file__).resolve().parent.parent / ".matplotlib"
+_MPL_CACHE_DIR = Path(tempfile.gettempdir()) / "mft_matplotlib"
 _MPL_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 os.environ.setdefault("MPLCONFIGDIR", str(_MPL_CACHE_DIR))
 

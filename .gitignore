@@ -1,2 +1,15 @@
 allData/
-*.md  
+output/pnl_snapshots.csv
+output/backtest.log
+.pytest_cache/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.DS_Store
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+llm_context/rawllmchat.md

@@ -4,11 +4,10 @@ Execution Engine — fills Orders at current market prices.
 Responsibilities:
   - Receive Orders from Strategy.
   - Look up current prices in MarketState.
-  - Produce Trade objects.
-  - No position tracking (that's Portfolio's job).
-
-Current model: immediate fill at last known price (no slippage).
-Future: could add slippage models, partial fills, etc.
+  - Apply optional slippage (bps) and per-order fees.
+  - Reject stale quotes when max_quote_age is set.
+  - Support atomic batches: the entire batch is cancelled if any leg fails.
+  - Produce Trade objects (no position tracking — that is Portfolio's job).
 """
 
 from __future__ import annotations
