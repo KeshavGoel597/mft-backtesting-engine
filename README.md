@@ -73,11 +73,15 @@ These files are generated artifacts and can be regenerated at any time.
 
 ## Design Notes
 
-Supplementary documentation lives in `documentation/`:
+Technical documentation lives in `documentation/`:
 
-- `assignment.md`: source problem statement
-- `assumptions.md`: implementation assumptions
-- `architecture.md`: system-level design
-- `BACKTEST_FRAMEWORK_SPEC.md`: module-level spec
-- `DOMAIN_MODEL.md`: domain model definitions
+- `README.md`: documentation index and reading order
+- `overview.md`: project scope and capabilities
+- `architecture.md`: runtime architecture and control flow
+- `domain-model.md`: domain entities and invariants
+- `module-specification.md`: module responsibilities and contracts
+- `data-and-assumptions.md`: dataset semantics and assumptions
+- `operations.md`: runbook and output interpretation
+- `testing.md`: test strategy and coverage areas
+- `decisions.md`: final design decisions and alternatives
 

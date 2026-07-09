@@ -1,20 +1,34 @@
-# llm_context/
+# Documentation
 
-This folder contains supplementary design and context documents used during development.
-These are **not** part of the framework's runtime code; they are reference material.
+This folder contains the maintained technical documentation for the backtesting engine.
+
+## Recommended Reading Order
+
+1. `overview.md`
+2. `architecture.md`
+3. `domain-model.md`
+4. `module-specification.md`
+5. `data-and-assumptions.md`
+6. `operations.md`
+7. `testing.md`
+8. `decisions.md`
+
+## Document Index
 
 | File | Purpose |
-|------|---------|
-| `assignment.md` | Original problem statement |
-| `assumptions.md` | Documented assumptions made during implementation |
-| `architecture.md` | High-level architecture decisions |
-| `BACKTEST_FRAMEWORK_SPEC.md` | Detailed module-level specification |
-| `DOMAIN_MODEL.md` | Domain model definitions |
-| `DecisionDecisions.md` | Key design decision log |
-| `datasetAnalysis.md` | Dataset exploration notes |
-| `context.md` | Additional context notes |
-| `implementationPlan.md` | Initial implementation plan |
-| `limitations.md` | Known limitations |
-| `openQuestions.md` | Open questions during design |
-| `ideas.md` | Ideas explored (not all implemented) |
-| `TODO.md` | Task list (all completed) |
+|---|---|
+| `overview.md` | Scope, goals, and key capabilities |
+| `architecture.md` | Runtime architecture and control flow |
+| `domain-model.md` | Core domain objects and invariants |
+| `module-specification.md` | Responsibilities and APIs by module |
+| `data-and-assumptions.md` | Dataset structure, replay semantics, assumptions |
+| `operations.md` | How to run, configure, and interpret outputs |
+| `testing.md` | Test strategy and coverage areas |
+| `decisions.md` | Final design decisions and rejected alternatives |
+| `reference/assignment-source.md` | Original assignment statement (archival source) |
+
+## Maintenance Policy
+
+- Keep this folder focused on implementation-relevant documentation.
+- Avoid planning notes and chat transcripts in the canonical docs set.
+- Put immutable source inputs (such as assignment text) under `reference/`.
