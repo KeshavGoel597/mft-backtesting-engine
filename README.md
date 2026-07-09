@@ -73,7 +73,7 @@ These files are generated artifacts and can be regenerated at any time.
 
 ## Design Notes
 
-Supplementary documentation lives in `llm_context/`:
+Supplementary documentation lives in `documentation/`:
 
 - `assignment.md`: source problem statement
 - `assumptions.md`: implementation assumptions
@@ -81,11 +81,3 @@ Supplementary documentation lives in `llm_context/`:
 - `BACKTEST_FRAMEWORK_SPEC.md`: module-level spec
 - `DOMAIN_MODEL.md`: domain model definitions
 
-## Resume Readiness Checklist
-
-This repository is structured to present well as a portfolio project, with:
-
-- A clear README and setup path
-- A deterministic test suite that runs without private data
-- Explicit documentation of what is generated versus source-controlled
-- Modular code that maps cleanly to the strategy/execution/replay architecture
